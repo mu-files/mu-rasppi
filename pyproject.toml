@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mu-rasppi"
+version = "0.1.0"
+description = "Raspberry Pi camera benchmarks and utilities"
+authors = [{name = "mu-files", email = "info@mu-files.com"}]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24.0,<2.0",
+    "picamera2",
+    "pidng @ git+https://github.com/schoolpost/PiDNG.git",
+    "muimg @ git+https://github.com/mu-files/mu-image.git@rasppi-compat#subdirectory=muimg",
+]

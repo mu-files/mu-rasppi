@@ -22,8 +22,9 @@ from picamera2 import Picamera2, MappedArray
 # muimg DNG Writer (Main Function)
 # =============================================================================
 
-def write_muimg(cfa_data: np.ndarray, output, compression, 
-                compression_args=None, camera_model=None, num_workers=1):
+def write_muimg(cfa_data: np.ndarray, output, compression,
+                compression_args=None, camera_model=None, num_workers=1,
+                preview: bool = False):
     """Write DNG using muimg library.
     
     Args:
@@ -33,9 +34,9 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         compression_args: Optional dict of compression arguments
         camera_model: PiDNG camera model (Picamera2Camera instance)
         num_workers: Number of compression workers
+        preview: If True, generate a JPEG-compressed 1/4 scale preview
     """
-    from muimg import write_dng, IfdDataSpec, PageEncoding
-    from muimg.tiff_metadata import MetadataTags
+    from muimg import write_dng, IfdDataSpec, PageEncoding, MetadataTags
     from tifffile import COMPRESSION
     
     # Unpack uint8 to uint16 if needed
@@ -82,10 +83,17 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         extratags=extra_tags,
     )
     
+    # Create preview params if requested
+    preview_params = None
+    if preview:
+        from muimg import PreviewParams, PreviewScale
+        preview_params = PreviewParams(scale=PreviewScale.QUARTER, compression=COMPRESSION.JPEG)
+    
     write_dng(
         destination_file=output,
         ifd0_spec=data_spec,
         num_compression_workers=num_workers,
+        preview=preview_params,
     )
 
 
@@ -222,7 +230,14 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
     results = []
     raw_size_mb = cfa_data.nbytes / (1024 * 1024)
     
-    for library, compression_name, destination, comp_obj, comp_args, num_workers in scenarios:
+    for scenario in scenarios:
+        library = scenario[0]
+        compression_name = scenario[1]
+        destination = scenario[2]
+        comp_obj = scenario[3]
+        comp_args = scenario[4] if len(scenario) > 4 else None
+        num_workers = scenario[5] if len(scenario) > 5 else 1
+        preview = scenario[6] if len(scenario) > 6 else None
         workers_str = f"w={num_workers}" if library == "muimg" else ""
         print(f"  {library:5s} | {compression_name:15s} | {workers_str:4s} | {destination:7s} ... ", 
               end="", flush=True)
@@ -251,7 +266,7 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
             elif library == "muimg":
                 write_muimg(cfa_data, output, compression=comp_obj, 
                            compression_args=comp_args, camera_model=camera_model,
-                           num_workers=num_workers)
+                           num_workers=num_workers, preview=preview)
             else:
                 raise ValueError(f"Unknown library: {library}")
             
@@ -400,7 +415,7 @@ def main():
     # Define test scenarios
     from tifffile import COMPRESSION
     scenarios = [
-        # (library, compression_name, destination, compression_obj, compression_args, num_workers)
+        # (library, compression_name, destination, comp_obj, compression_args, num_workers, preview)
         
         # PiDNG tests (file only)
         ("pidng", "uncompressed", "file", None, None, 1),
@@ -425,6 +440,13 @@ def main():
          {'distance': 0.5, 'effort': 4}, 2),
         ("muimg", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.5, 'effort': 4}, 4),
+        
+        # muimg tests - with preview
+        ("muimg", "uncompressed+preview", "file", COMPRESSION.NONE, None, 1, True),
+        ("muimg", "jxl_lossless+preview", "file", COMPRESSION.JPEGXL_DNG,
+         {'distance': 0.0, 'effort': 2}, 4, True),
+        ("muimg", "jxl_lossy+preview", "file", COMPRESSION.JPEGXL_DNG,
+         {'distance': 0.5, 'effort': 4}, 4, True),
     ]
     
     iterations = 10

@@ -590,11 +590,15 @@ def main():
 if __name__ == "__main__":
     import logging
     import sys
+    import os
     
     # Parse args first to get verbose level
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-v", "--verbose", action="count", default=0)
     args, _ = parser.parse_known_args()
+    
+    # Set libcamera log levels to WARN to reduce noise
+    os.environ['LIBCAMERA_LOG_LEVELS'] = '1'  # 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
     
     # Set logging level based on verbosity
     if args.verbose >= 2:
@@ -608,4 +612,9 @@ if __name__ == "__main__":
         level=level,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
+    
+    # Set picamera2 logging to match command line verbosity
+    picamera2_logger = logging.getLogger('picamera2')
+    picamera2_logger.setLevel(level)
+    
     main()

@@ -12,5 +12,5 @@ dependencies = [
     "numpy>=1.24.0,<2.0",
     "picamera2",
     "pidng @ git+https://github.com/schoolpost/PiDNG.git",
-    "muimg @ git+https://github.com/mu-files/mu-image.git@rasppi-compat#subdirectory=muimg",
+    "muimg @ git+https://github.com/mu-files/mu-image.git#subdirectory=muimg",
 ]

@@ -224,6 +224,7 @@ def capture():
         
         # Get format configuration
         fmt_dict = picam2.camera_configuration()['raw']
+        print(f"  Format dict: {fmt_dict}")
     
     # Stop camera (we only need one capture)
     picam2.stop()
@@ -231,10 +232,14 @@ def capture():
     # Display capture info
     width = cfa_data.shape[1]
     if cfa_data.dtype == np.uint8:
-        width *= 2  # Packed uint8: 2 bytes per pixel
+        width //= 2  # Packed uint8: 2 bytes per pixel
+    # Parse bit depth from format string (e.g., "SBGGR12" -> 12)
+    fmt_str = fmt_dict.get('format', 'unknown')
+    bpp = int(''.join(filter(str.isdigit, fmt_str))) if any(c.isdigit() for c in fmt_str) else 'unknown'
+    
     print(f"  Image size: {width}x{cfa_data.shape[0]}")
-    print(f"  Format: {fmt_dict.get('format', 'unknown')}")
-    print(f"  Bit depth: {fmt_dict.get('bpp', 'unknown')}")
+    print(f"  Format: {fmt_str}")
+    print(f"  Bit depth: {bpp}")
     print(f"  Data type: {cfa_data.dtype} ({'packed' if cfa_data.dtype == np.uint8 else 'unpacked'})")
     print(f"  Value range: {cfa_data.min()}-{cfa_data.max()}")
     print(f"  Raw size: {cfa_data.nbytes / (1024 * 1024):.2f} MB")

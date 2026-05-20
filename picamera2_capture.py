@@ -8,6 +8,10 @@ This script is designed to be simple and self-contained for sharing with
 the Raspberry Pi community.
 """
 
+import os
+# Set libcamera log levels to WARN before any imports
+os.environ['LIBCAMERA_LOG_LEVELS'] = '1'  # 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
+
 import argparse
 import io
 import json
@@ -590,15 +594,11 @@ def main():
 if __name__ == "__main__":
     import logging
     import sys
-    import os
     
     # Parse args first to get verbose level
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-v", "--verbose", action="count", default=0)
     args, _ = parser.parse_known_args()
-    
-    # Set libcamera log levels to WARN to reduce noise
-    os.environ['LIBCAMERA_LOG_LEVELS'] = '1'  # 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
     
     # Set logging level based on verbosity
     if args.verbose >= 2:

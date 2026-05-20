@@ -130,9 +130,7 @@ def convert_to_16bit_for_jxl(cfa_data, bits_per_sample, extra_tags):
     black_level = extra_tags.get_tag("BlackLevel")
     if black_level is not None:
         # Handle array, list, tuple, or scalar
-        if isinstance(black_level, (list, tuple)):
-            scaled_black = [int(b * dest_max / source_max) for b in black_level]
-        elif isinstance(black_level, np.ndarray):
+        if isinstance(black_level, (list, tuple, np.ndarray)):
             scaled_black = [int(b * dest_max / source_max) for b in black_level]
         else:
             scaled_black = int(black_level * dest_max / source_max)
@@ -142,9 +140,7 @@ def convert_to_16bit_for_jxl(cfa_data, bits_per_sample, extra_tags):
     white_level = extra_tags.get_tag("WhiteLevel")
     if white_level is not None:
         # Handle array, list, tuple, or scalar
-        if isinstance(white_level, (list, tuple)):
-            scaled_white = [int(w * dest_max / source_max) for w in white_level]
-        elif isinstance(white_level, np.ndarray):
+        if isinstance(white_level, (list, tuple, np.ndarray)):
             scaled_white = [int(w * dest_max / source_max) for w in white_level]
         else:
             scaled_white = int(white_level * dest_max / source_max)
@@ -224,7 +220,6 @@ def capture():
         
         # Get format configuration
         fmt_dict = picam2.camera_configuration()['raw']
-        print(f"  Format dict: {fmt_dict}")
     
     # Stop camera (we only need one capture)
     picam2.stop()
@@ -510,10 +505,14 @@ def main():
         description="Capture raw image from picamera2 and write DNG with various options"
     )
     parser.add_argument(
+        "-v", "--verbose", action="count", default=0,
+        help="Increase verbosity (use -v or -vv for more detail)"
+    )
+    parser.add_argument(
         "--mode",
         choices=["benchmark", "single"],
-        default="benchmark",
-        help="Run mode: benchmark (default) or single capture"
+        default="single",
+        help="Run mode: single capture or benchmark (default: single)"
     )
     parser.add_argument(
         "--compression",
@@ -589,4 +588,24 @@ def main():
 
 
 if __name__ == "__main__":
+    import logging
+    import sys
+    
+    # Parse args first to get verbose level
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-v", "--verbose", action="count", default=0)
+    args, _ = parser.parse_known_args()
+    
+    # Set logging level based on verbosity
+    if args.verbose >= 2:
+        level = logging.DEBUG
+    elif args.verbose >= 1:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+    
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     main()

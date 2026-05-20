@@ -55,21 +55,21 @@ muimg    jxl_lossy        w=4   file      452.8± 3.4      0.87    27.1x        
 
 ### Prerequisites
 - Raspberry Pi with camera (tested on HQ Camera with IMX477 sensor)
-- Python 3.11+
+- Python 3.12+
 - picamera2 installed system-wide
 
 ### Setup
 
 ```bash
 # Clone this repository
-git clone https://github.com/YOUR_USERNAME/mu-rasppi.git
+git clone https://github.com/mu-files/mu-rasppi.git
 cd mu-rasppi
 
 # Create virtual environment with system site packages (for picamera2)
-/usr/bin/python3 -m venv --system-site-packages venv
+python3 -m venv --system-site-packages venv
 
 # Install dependencies
-venv/bin/pip install -e .
+venv/bin/pip install .
 ```
 
 **Note**: muimg is installed directly from the main branch of the mu-image repository.
@@ -102,7 +102,7 @@ See the complete implementation at the top of [`picamera2_capture.py`](picamera2
 - **Device**: Raspberry Pi 5 Model B Rev 1.0
 - **Camera**: Raspberry Pi HQ Camera (IMX477 sensor)
 - **Image Size**: 4064×3040 pixels, 16-bit raw
-- **OS**: Raspberry Pi OS (64-bit)
+- **OS**: Debian GNU/Linux 13 (trixie) 64-bit
 
 ## License
 

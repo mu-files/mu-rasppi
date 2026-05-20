@@ -72,11 +72,7 @@ cd mu-rasppi
 venv/bin/pip install -e .
 ```
 
-**Note**: The muimg dependency uses the `rasppi-compat` branch due to:
-- **Python 3.11 compatibility**: Latest tifffile (with DNG bug fixes) requires Python 3.12+, but Raspberry Pi OS uses Python 3.11
-- **numpy version constraints**: Raspberry Pi requires numpy <2.0 for ARM compatibility
-
-This is handled automatically in `pyproject.toml`.
+**Note**: muimg is installed directly from the main branch of the mu-image repository.
 
 ## Usage
 

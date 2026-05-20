@@ -36,7 +36,7 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         num_workers: Number of compression workers
         preview: If True, generate a JPEG-compressed 1/4 scale preview
     """
-    from muimg import write_dng, IfdDataSpec, PageEncoding, MetadataTags
+    from muimg import write_dng_from_array, IfdDataSpec, PageEncoding, MetadataTags
     from tifffile import COMPRESSION
     
     # Unpack uint8 to uint16 if needed
@@ -89,11 +89,11 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         from muimg import PreviewParams, PreviewScale
         preview_params = PreviewParams(scale=PreviewScale.QUARTER, compression=COMPRESSION.JPEG)
     
-    write_dng(
+    write_dng_from_array(
         destination_file=output,
-        ifd0_spec=data_spec,
-        num_compression_workers=num_workers,
+        data_spec=data_spec,
         preview=preview_params,
+        num_compression_workers=num_workers,
     )
 
 

@@ -8,14 +8,11 @@ This script is designed to be simple and self-contained for sharing with
 the Raspberry Pi community.
 """
 
-import os
-# Set libcamera log levels to WARN before any imports
-os.environ['LIBCAMERA_LOG_LEVELS'] = '1'  # 0=ERROR, 1=WARN, 2=INFO, 3=DEBUG
-
 import argparse
 import io
 import json
 import time
+from contextlib import redirect_stderr
 from datetime import datetime
 from pathlib import Path
 
@@ -41,7 +38,8 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         num_workers: Number of compression workers
         preview: If True, generate a JPEG-compressed 1/4 scale preview
     """
-    from muimg import write_dng_from_array, IfdDataSpec, PageEncoding, MetadataTags
+    from muimg.dngio import write_dng_from_array, IfdDataSpec, PageEncoding
+    from muimg.tiff_metadata import MetadataTags
     from tifffile import COMPRESSION
     
     # Unpack uint8 to uint16 if needed
@@ -91,7 +89,7 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
     # Create preview params if requested
     preview_params = None
     if preview:
-        from muimg import PreviewParams, PreviewScale
+        from muimg.dngio import PreviewParams, PreviewScale
         preview_params = PreviewParams(scale=PreviewScale.QUARTER, compression=COMPRESSION.JPEG)
     
     write_dng_from_array(

@@ -48,14 +48,10 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
     
     # Extract tags from camera model
     extra_tags = MetadataTags()
-    bits_per_sample = 12
-    cfa_pattern = "RGGB"  # Default
     
     if camera_model is not None:
         for tag_obj in camera_model.tags.list():
             extra_tags.add_tag(tag_obj.TagId, tag_obj.rawValue)
-        bits_per_sample = extra_tags.get_tag("BitsPerSample") or 12
-        cfa_pattern = extra_tags.get_tag("CFAPattern") or "RGGB"
         
         # For IMX477 (HQ Camera): set default crop to exclude optical black columns
         # Full sensor: 4064x3040, Cropped area: 4056x3040 (skip 8 cols on right side)
@@ -64,8 +60,9 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
             extra_tags.add_tag("DefaultCropSize", [4056, 3040])  # H, V size
     
     # For JXL compression, convert to 16-bit (if not already)
+    bits_per_sample = extra_tags.get_tag("BitsPerSample") or 16
     if compression == COMPRESSION.JPEGXL_DNG and bits_per_sample != 16:
-        cfa_data, bits_per_sample = convert_to_16bit_for_jxl(
+        cfa_data, _ = convert_to_16bit_for_jxl(
             cfa_data, bits_per_sample, extra_tags
         )
     
@@ -80,8 +77,6 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
     data_spec = IfdDataSpec(
         data=cfa_data,
         photometric="CFA",
-        bits_per_sample=bits_per_sample,
-        cfa_pattern=cfa_pattern,
         encoding=encoding,
         extratags=extra_tags,
     )

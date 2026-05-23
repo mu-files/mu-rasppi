@@ -9,28 +9,28 @@ Tested on **Raspberry Pi 5 Model B** with Raspberry Pi HQ Camera (IMX477 sensor)
 ```
 Library  Compression            Work   Time(ms)    FPS   Size(MB)  Ratio
 -------------------------------------------------------------------------
-pidng    uncompressed                   41.7±3.4  23.96    23.52    1.0x
-pidng    lj92                          422.8±2.2   2.37    16.46    1.4x
-muimg    uncompressed           w=1     25.2±15.1 39.61    23.57    1.0x
-muimg    jpeg_lossless          w=1    620.4±2.6   1.61    15.43    1.5x
-muimg    jpeg_lossless          w=2    318.8±0.8   3.14    15.43    1.5x
-muimg    jpeg_lossless          w=4    171.2±0.2   5.84    15.43    1.5x
-muimg    jxl_lossless           w=1    575.6±4.1   1.74     9.08    2.6x
-muimg    jxl_lossless           w=2    336.9±6.9   2.97     9.08    2.6x
-muimg    jxl_lossless           w=4    265.9±2.9   3.76     9.08    2.6x
-muimg    jxl_lossy              w=1    923.4±1.7   1.08     0.62   37.7x
-muimg    jxl_lossy              w=2    583.1±4.1   1.72     0.62   37.7x
-muimg    jxl_lossy              w=4    486.6±5.0   2.05     0.62   37.7x
-muimg    uncompressed+preview   w=1    444.8±2.7   2.25    23.74    1.0x
-muimg    jxl_lossless+preview   w=4    693.2±1.1   1.44     9.25    2.5x
-muimg    jxl_lossy+preview      w=4    918.6±6.1   1.09     0.80   29.5x
+pidng    uncompressed                   39.9±3.4  25.08    23.52    1.0x
+pidng    lj92                          429.2±2.8   2.33    17.21    1.4x
+muimg    uncompressed           w=1     21.6±12.2 46.19    23.57    1.0x
+muimg    jpeg_lossless          w=1    639.2±3.4   1.56    16.45    1.4x
+muimg    jpeg_lossless          w=2    329.1±1.4   3.04    16.45    1.4x
+muimg    jpeg_lossless          w=4    175.3±1.3   5.70    16.45    1.4x
+muimg    jxl_lossless           w=1    588.8±2.3   1.70     9.89    2.4x
+muimg    jxl_lossless           w=2    356.6±2.4   2.80     9.89    2.4x
+muimg    jxl_lossless           w=4    271.6±3.6   3.68     9.89    2.4x
+muimg    jxl_lossy              w=1   1028.2±3.9   0.97     1.14   20.7x
+muimg    jxl_lossy              w=2    618.6±2.8   1.62     1.14   20.7x
+muimg    jxl_lossy              w=4    509.4±5.1   1.96     1.14   20.7x
+muimg    uncompressed+preview   w=1    447.9±3.5   2.23    23.80    1.0x
+muimg    jxl_lossless+preview   w=4    701.4±4.1   1.43    10.12    2.3x
+muimg    jxl_lossy+preview      w=4    943.6±3.2   1.06     1.37   17.2x
 ```
 
 **Key Findings:**
-- **muimg uncompressed is 1.7× faster** than PiDNG (25ms vs 42ms)
+- **muimg uncompressed is 1.8× faster** than PiDNG (22ms vs 40ms)
 - **Multi-core compression scales well**: 4 workers achieve 3.6× speedup for JPEG lossless
-- **JPEG XL lossless** provides 2.6× compression with reasonable speed (266ms with 4 workers)
-- **JPEG XL lossy** achieves 38× compression for applications where slight quality loss is acceptable
+- **JPEG XL lossless** provides 2.4× compression with reasonable speed (272ms with 4 workers)
+- **JPEG XL lossy** achieves 21× compression for applications where slight quality loss is acceptable
 - **Preview generation** adds ~430ms to render a color-corrected JPEG preview embedded in the DNG, enabling instant thumbnails in file browsers and photo applications
 
 ## PiDNG vs muimg Comparison
@@ -78,11 +78,10 @@ venv/bin/pip install .
 
 ```bash
 # Run benchmark (10 iterations per scenario)
-venv/bin/python picamera2_capture.py
+venv/bin/python picamera2_capture.py --mode benchmark --iterations 10
 
-# Results are displayed in console and saved to:
-# - results/benchmark_picamera2_results.json
-# - results/test_*.dng (sample DNG files from each scenario)
+# Single capture with preview generation
+venv/bin/python picamera2_capture.py -v --mode single --preview
 ```
 
 ## Example Code

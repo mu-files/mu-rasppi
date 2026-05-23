@@ -7,31 +7,35 @@ Tested on **Raspberry Pi 5 Model B** with Raspberry Pi HQ Camera (IMX477 sensor)
 ## Benchmark Results
 
 ```
-=============================================================================================================================
+===================================================================================================================================
 BENCHMARK RESULTS
-=============================================================================================================================
-Library  Compression      Work  Dest     Time(ms)     Size(MB)   Ratio    Throughput(MB/s) FPS     
------------------------------------------------------------------------------------------------------------------------------
-pidng    uncompressed           file       35.5± 3.2     23.52     1.0x           664.3   28.19
-pidng    lj92                   file      434.9± 2.3     16.84     1.4x            54.2    2.30
-muimg    uncompressed     w=1   file       17.3± 5.8     23.57     1.0x          1358.4   57.65
-muimg    jpeg_lossless    w=1   file      638.0± 2.2     16.07     1.5x            36.9    1.57
-muimg    jpeg_lossless    w=2   file      326.6± 1.0     16.07     1.5x            72.2    3.06
-muimg    jpeg_lossless    w=4   file      177.3± 2.2     16.07     1.5x           132.9    5.64
-muimg    jxl_lossless     w=1   file      583.5± 1.1      9.62     2.5x            40.4    1.71
-muimg    jxl_lossless     w=2   file      355.8±10.2      9.62     2.5x            66.2    2.81
-muimg    jxl_lossless     w=4   file      261.4± 3.8      9.62     2.5x            90.1    3.83
-muimg    jxl_lossy        w=1   file      947.9±10.1      0.87    27.1x            24.9    1.05
-muimg    jxl_lossy        w=2   file      554.7± 8.4      0.87    27.1x            42.5    1.80
-muimg    jxl_lossy        w=4   file      452.8± 3.4      0.87    27.1x            52.0    2.21
-=============================================================================================================================
+===================================================================================================================================
+Library  Compression            Work  Dest     Time(ms)     Size(MB)   Ratio    Throughput(MB/s) FPS     
+-----------------------------------------------------------------------------------------------------------------------------------
+pidng    uncompressed                 file       41.7± 3.4     23.52     1.0x           564.6   23.96
+pidng    lj92                         file      422.8± 2.2     16.46     1.4x            55.7    2.37
+muimg    uncompressed           w=1   file       25.2±15.1     23.57     1.0x           933.4   39.61
+muimg    jpeg_lossless          w=1   file      620.4± 2.6     15.43     1.5x            38.0    1.61
+muimg    jpeg_lossless          w=2   file      318.8± 0.8     15.43     1.5x            73.9    3.14
+muimg    jpeg_lossless          w=4   file      171.2± 0.2     15.43     1.5x           137.6    5.84
+muimg    jxl_lossless           w=1   file      575.6± 4.1      9.08     2.6x            40.9    1.74
+muimg    jxl_lossless           w=2   file      336.9± 6.9      9.08     2.6x            69.9    2.97
+muimg    jxl_lossless           w=4   file      265.9± 2.9      9.08     2.6x            88.6    3.76
+muimg    jxl_lossy              w=1   file      923.4± 1.7      0.62    37.7x            25.5    1.08
+muimg    jxl_lossy              w=2   file      583.1± 4.1      0.62    37.7x            40.4    1.72
+muimg    jxl_lossy              w=4   file      486.6± 5.0      0.62    37.7x            48.4    2.05
+muimg    uncompressed+preview   w=1   file      444.8± 2.7     23.74     1.0x            53.0    2.25
+muimg    jxl_lossless+preview   w=4   file      693.2± 1.1      9.25     2.5x            34.0    1.44
+muimg    jxl_lossy+preview      w=4   file      918.6± 6.1      0.80    29.5x            25.7    1.09
+===================================================================================================================================
 ```
 
 **Key Findings:**
-- **muimg uncompressed is 2× faster** than PiDNG (17.3ms vs 35.5ms)
+- **muimg uncompressed is 1.7× faster** than PiDNG (25ms vs 42ms)
 - **Multi-core compression scales well**: 4 workers achieve 3.6× speedup for JPEG lossless
-- **JPEG XL lossless** provides 2.5× compression with reasonable speed (261ms with 4 workers)
-- **JPEG XL lossy** achieves 27× compression for applications where slight quality loss is acceptable
+- **JPEG XL lossless** provides 2.6× compression with reasonable speed (266ms with 4 workers)
+- **JPEG XL lossy** achieves 38× compression for applications where slight quality loss is acceptable
+- **Preview generation** adds ~430ms to render a color-corrected JPEG preview embedded in the DNG, enabling instant thumbnails in file browsers and photo applications
 
 ## PiDNG vs muimg Comparison
 

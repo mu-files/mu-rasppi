@@ -357,21 +357,23 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
 
 def print_results_table(results):
     """Print formatted results table."""
-    print("\n" + "=" * 131)
+    w = 73
+    print("\n" + "=" * w)
     print("BENCHMARK RESULTS")
-    print("=" * 131)
-    print(f"{'Library':<8} {'Compression':<22} {'Work':<5} {'Dest':<8} {'Time(ms)':<12} "
-          f"{'Size(MB)':<10} {'Ratio':<8} {'Throughput(MB/s)':<16} {'FPS':<8}")
-    print("-" * 131)
+    print("=" * w)
+    print(f"{'Library':<8} {'Compression':<22} {'Work':<5} "
+          f"{'Time(ms)':<12} {'FPS':>5}  "
+          f"{'Size(MB)':>8}  {'Ratio':>5}")
+    print("-" * w)
     
     for r in results:
         workers = f"w={r['num_workers']}" if r['num_workers'] else ""
-        print(f"{r['library']:<8} {r['compression']:<22} {workers:<5} {r['destination']:<8} "
-              f"{r['mean_time_ms']:6.1f}±{r['std_time_ms']:4.1f}  "
-              f"{r['file_size_mb']:8.2f}  {r['compression_ratio']:6.1f}x  "
-              f"{r['throughput_mbs']:14.1f}  {r['frames_per_sec']:6.2f}")
+        print(f"{r['library']:<8} {r['compression']:<22} {workers:<5} "
+              f"{r['mean_time_ms']:6.1f}±{r['std_time_ms']:4.1f} "
+              f"{r['frames_per_sec']:5.2f}  "
+              f"{r['file_size_mb']:8.2f}  {r['compression_ratio']:5.1f}x")
     
-    print("=" * 131)
+    print("=" * w)
 
 
 def save_results_json(results, output_path):

@@ -8,9 +8,11 @@ This script is designed to be simple and self-contained for sharing with
 the Raspberry Pi community.
 """
 
+import argparse
 import io
 import json
 import time
+from contextlib import redirect_stderr
 from datetime import datetime
 from pathlib import Path
 
@@ -22,8 +24,9 @@ from picamera2 import Picamera2, MappedArray
 # muimg DNG Writer (Main Function)
 # =============================================================================
 
-def write_muimg(cfa_data: np.ndarray, output, compression, 
-                compression_args=None, camera_model=None, num_workers=1):
+def write_muimg(cfa_data: np.ndarray, output, compression,
+                compression_args=None, camera_model=None, num_workers=1,
+                preview: bool = False):
     """Write DNG using muimg library.
     
     Args:
@@ -33,8 +36,9 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         compression_args: Optional dict of compression arguments
         camera_model: PiDNG camera model (Picamera2Camera instance)
         num_workers: Number of compression workers
+        preview: If True, generate a JPEG-compressed 1/4 scale preview
     """
-    from muimg import write_dng, IfdDataSpec, PageEncoding
+    from muimg.dngio import write_dng_from_array, IfdDataSpec, PageEncoding
     from muimg.tiff_metadata import MetadataTags
     from tifffile import COMPRESSION
     
@@ -44,14 +48,10 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
     
     # Extract tags from camera model
     extra_tags = MetadataTags()
-    bits_per_sample = 12
-    cfa_pattern = "RGGB"  # Default
     
     if camera_model is not None:
         for tag_obj in camera_model.tags.list():
             extra_tags.add_tag(tag_obj.TagId, tag_obj.rawValue)
-        bits_per_sample = extra_tags.get_tag("BitsPerSample") or 12
-        cfa_pattern = extra_tags.get_tag("CFAPattern") or "RGGB"
         
         # For IMX477 (HQ Camera): set default crop to exclude optical black columns
         # Full sensor: 4064x3040, Cropped area: 4056x3040 (skip 8 cols on right side)
@@ -60,8 +60,9 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
             extra_tags.add_tag("DefaultCropSize", [4056, 3040])  # H, V size
     
     # For JXL compression, convert to 16-bit (if not already)
+    bits_per_sample = extra_tags.get_tag("BitsPerSample") or 16
     if compression == COMPRESSION.JPEGXL_DNG and bits_per_sample != 16:
-        cfa_data, bits_per_sample = convert_to_16bit_for_jxl(
+        cfa_data, _ = convert_to_16bit_for_jxl(
             cfa_data, bits_per_sample, extra_tags
         )
     
@@ -76,15 +77,20 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
     data_spec = IfdDataSpec(
         data=cfa_data,
         photometric="CFA",
-        bits_per_sample=bits_per_sample,
-        cfa_pattern=cfa_pattern,
         encoding=encoding,
         extratags=extra_tags,
     )
     
-    write_dng(
+    # Create preview params if requested
+    preview_params = None
+    if preview:
+        from muimg.dngio import PreviewParams, PreviewScale
+        preview_params = PreviewParams(scale=PreviewScale.QUARTER, compression=COMPRESSION.JPEG)
+    
+    write_dng_from_array(
         destination_file=output,
-        ifd0_spec=data_spec,
+        data_spec=data_spec,
+        preview=preview_params,
         num_compression_workers=num_workers,
     )
 
@@ -121,9 +127,7 @@ def convert_to_16bit_for_jxl(cfa_data, bits_per_sample, extra_tags):
     black_level = extra_tags.get_tag("BlackLevel")
     if black_level is not None:
         # Handle array, list, tuple, or scalar
-        if isinstance(black_level, (list, tuple)):
-            scaled_black = [int(b * dest_max / source_max) for b in black_level]
-        elif isinstance(black_level, np.ndarray):
+        if isinstance(black_level, (list, tuple, np.ndarray)):
             scaled_black = [int(b * dest_max / source_max) for b in black_level]
         else:
             scaled_black = int(black_level * dest_max / source_max)
@@ -133,45 +137,13 @@ def convert_to_16bit_for_jxl(cfa_data, bits_per_sample, extra_tags):
     white_level = extra_tags.get_tag("WhiteLevel")
     if white_level is not None:
         # Handle array, list, tuple, or scalar
-        if isinstance(white_level, (list, tuple)):
-            scaled_white = [int(w * dest_max / source_max) for w in white_level]
-        elif isinstance(white_level, np.ndarray):
+        if isinstance(white_level, (list, tuple, np.ndarray)):
             scaled_white = [int(w * dest_max / source_max) for w in white_level]
         else:
             scaled_white = int(white_level * dest_max / source_max)
         extra_tags.add_tag("WhiteLevel", scaled_white)
     
     return cfa_data, 16
-
-
-# =============================================================================
-# Picamera2 Capture
-# =============================================================================
-
-def capture_raw_image(picam2):
-    """Capture a raw CFA image using picamera2.
-    
-    Args:
-        picam2: Configured and started Picamera2 instance
-        
-    Returns:
-        tuple: (cfa_data, metadata, fmt_dict)
-            - cfa_data: Raw CFA array as captured (uint8 packed format)
-            - metadata: Camera metadata dict
-            - fmt_dict: Format configuration dict
-    """
-    with picam2.captured_request() as request:
-        # Extract raw array
-        with MappedArray(request, 'raw') as m:
-            cfa_data = m.array.copy()
-        
-        # Get metadata
-        metadata = request.get_metadata()
-        
-        # Get format configuration
-        fmt_dict = picam2.camera_configuration()['raw']
-    
-    return cfa_data, metadata, fmt_dict
 
 
 # =============================================================================
@@ -201,6 +173,79 @@ def write_pidng(cfa_data: np.ndarray, output, compress: bool = False,
     r.convert(cfa_data, filename=str(output))
 
 # =============================================================================
+# Camera Initialization and Capture
+# =============================================================================
+
+def capture():
+    """Initialize picamera2, capture raw image, and create camera model.
+    
+    Returns:
+        tuple: (cfa_data, camera_model)
+            - cfa_data: Raw CFA array (uint16)
+            - camera_model: PiDNG camera model
+    """
+    # Initialize and configure picamera2
+    print("Initializing picamera2...")
+    picam2 = Picamera2()
+    
+    # Configure for raw capture (uncompressed format)
+    raw_config = {'format': 'SBGGR12'}
+    config = picam2.create_still_configuration(raw=raw_config, buffer_count=2)
+    picam2.configure(config)
+    
+    print("  Configuration:")
+    print(f"    Raw format: {raw_config['format']}")
+    print()
+    
+    # Start camera
+    picam2.start()
+    
+    # Wait for camera to stabilize
+    print("Waiting for camera to stabilize...")
+    time.sleep(1)
+    print()
+    
+    # Capture raw image
+    print("Capturing raw image...")
+    with picam2.captured_request() as request:
+        # Extract raw array
+        with MappedArray(request, 'raw') as m:
+            cfa_data = m.array.copy()
+        
+        # Get metadata
+        metadata = request.get_metadata()
+        
+        # Get format configuration
+        fmt_dict = picam2.camera_configuration()['raw']
+    
+    # Stop camera (we only need one capture)
+    picam2.stop()
+    
+    # Display capture info
+    width = cfa_data.shape[1]
+    if cfa_data.dtype == np.uint8:
+        width //= 2  # Packed uint8: 2 bytes per pixel
+    # Parse bit depth from format string (e.g., "SBGGR12" -> 12)
+    fmt_str = fmt_dict.get('format', 'unknown')
+    bpp = int(''.join(filter(str.isdigit, fmt_str))) if any(c.isdigit() for c in fmt_str) else 'unknown'
+    
+    print(f"  Image size: {width}x{cfa_data.shape[0]}")
+    print(f"  Format: {fmt_str}")
+    print(f"  Bit depth: {bpp}")
+    print(f"  Data type: {cfa_data.dtype} ({'packed' if cfa_data.dtype == np.uint8 else 'unpacked'})")
+    print(f"  Value range: {cfa_data.min()}-{cfa_data.max()}")
+    print(f"  Raw size: {cfa_data.nbytes / (1024 * 1024):.2f} MB")
+    print()
+    
+    # Create PiDNG camera model from picamera2 metadata
+    from pidng.camdefs import Picamera2Camera
+    camera_model = Picamera2Camera(fmt_dict, metadata, model="Picamera2 Benchmark")
+    print(f"Camera model: {camera_model.model}")
+    print()
+    
+    return cfa_data, camera_model
+
+# =============================================================================
 # Benchmark Runner
 # =============================================================================
 
@@ -222,9 +267,16 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
     results = []
     raw_size_mb = cfa_data.nbytes / (1024 * 1024)
     
-    for library, compression_name, destination, comp_obj, comp_args, num_workers in scenarios:
+    for scenario in scenarios:
+        library = scenario[0]
+        compression_name = scenario[1]
+        destination = scenario[2]
+        comp_obj = scenario[3]
+        comp_args = scenario[4] if len(scenario) > 4 else None
+        num_workers = scenario[5] if len(scenario) > 5 else 1
+        preview = scenario[6] if len(scenario) > 6 else None
         workers_str = f"w={num_workers}" if library == "muimg" else ""
-        print(f"  {library:5s} | {compression_name:15s} | {workers_str:4s} | {destination:7s} ... ", 
+        print(f"  {library:5s} | {compression_name:22s} | {workers_str:4s} | {destination:7s} ... ", 
               end="", flush=True)
         
         times = []
@@ -251,7 +303,7 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
             elif library == "muimg":
                 write_muimg(cfa_data, output, compression=comp_obj, 
                            compression_args=comp_args, camera_model=camera_model,
-                           num_workers=num_workers)
+                           num_workers=num_workers, preview=preview)
             else:
                 raise ValueError(f"Unknown library: {library}")
             
@@ -305,21 +357,21 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
 
 def print_results_table(results):
     """Print formatted results table."""
-    print("\n" + "=" * 125)
+    print("\n" + "=" * 131)
     print("BENCHMARK RESULTS")
-    print("=" * 125)
-    print(f"{'Library':<8} {'Compression':<16} {'Work':<5} {'Dest':<8} {'Time(ms)':<12} "
+    print("=" * 131)
+    print(f"{'Library':<8} {'Compression':<22} {'Work':<5} {'Dest':<8} {'Time(ms)':<12} "
           f"{'Size(MB)':<10} {'Ratio':<8} {'Throughput(MB/s)':<16} {'FPS':<8}")
-    print("-" * 125)
+    print("-" * 131)
     
     for r in results:
         workers = f"w={r['num_workers']}" if r['num_workers'] else ""
-        print(f"{r['library']:<8} {r['compression']:<16} {workers:<5} {r['destination']:<8} "
+        print(f"{r['library']:<8} {r['compression']:<22} {workers:<5} {r['destination']:<8} "
               f"{r['mean_time_ms']:6.1f}±{r['std_time_ms']:4.1f}  "
               f"{r['file_size_mb']:8.2f}  {r['compression_ratio']:6.1f}x  "
               f"{r['throughput_mbs']:14.1f}  {r['frames_per_sec']:6.2f}")
     
-    print("=" * 125)
+    print("=" * 131)
 
 
 def save_results_json(results, output_path):
@@ -336,71 +388,63 @@ def save_results_json(results, output_path):
 
 
 # =============================================================================
-# Main
+# Single Capture Mode
 # =============================================================================
 
-def main():
-    """Run picamera2 capture and DNG writing benchmark."""
-    # Create results directory
-    Path("results").mkdir(exist_ok=True)
+def run_single_mode(cfa_data, camera_model, compression_name, compression,
+                   compression_args, num_workers, preview, output_path):
+    """Run single capture scenario.
     
-    print("=" * 90)
-    print("Picamera2 DNG Capture and Writing Benchmark: PiDNG vs muimg")
-    print("=" * 90)
+    Args:
+        cfa_data: Raw CFA data
+        camera_model: PiDNG camera model
+        compression_name: Name for display
+        compression: tifffile COMPRESSION enum
+        compression_args: Compression arguments dict
+        num_workers: Number of workers
+        preview: Enable preview generation
+        output_path: Output file path
+    """
+    print(f"\nSingle capture: {compression_name}")
+    print(f"  Workers: {num_workers}")
+    print(f"  Preview: {'yes' if preview else 'no'}")
+    print(f"  Output: {output_path}")
     print()
     
-    # Initialize and configure picamera2
-    print("Initializing picamera2...")
-    picam2 = Picamera2()
+    # Run capture
+    write_muimg(
+        cfa_data, output_path, compression,
+        compression_args=compression_args,
+        camera_model=camera_model,
+        num_workers=num_workers,
+        preview=preview
+    )
     
-    # Configure for raw capture (uncompressed format)
-    raw_config = {'format': 'SBGGR12'}
-    config = picam2.create_still_configuration(raw=raw_config, buffer_count=2)
-    picam2.configure(config)
+    # Print file info
+    file_size_mb = output_path.stat().st_size / (1024 * 1024)
+    raw_size_mb = cfa_data.nbytes / (1024 * 1024)
+    print(f"\nOutput file: {output_path}")
+    print(f"  Size: {file_size_mb:.2f} MB")
+    print(f"  Compression ratio: {raw_size_mb/file_size_mb:.1f}x")
+
+
+# =============================================================================
+# Benchmark Mode
+# =============================================================================
+
+def run_benchmark_mode(cfa_data, camera_model, iterations=10):
+    """Run full benchmark with all scenarios.
     
-    print("  Configuration:")
-    print(f"    Raw format: {raw_config['format']}")
-    print()
-    
-    # Start camera
-    picam2.start()
-    
-    # Wait for camera to stabilize
-    print("Waiting for camera to stabilize...")
-    time.sleep(1)
-    print()
-    
-    # Capture raw image
-    print("Capturing raw image...")
-    cfa_data, metadata, fmt_dict = capture_raw_image(picam2)
-    
-    # Stop camera (we only need one capture)
-    picam2.stop()
-    
-    # Display info (unpack for display if needed)
-    if cfa_data.dtype == np.uint8:
-        display_data = cfa_data.view(np.uint16).reshape(cfa_data.shape[0], cfa_data.shape[1] // 2)
-    else:
-        display_data = cfa_data
-    
-    print(f"  Image size: {display_data.shape[1]}x{display_data.shape[0]}")
-    print(f"  Format: {fmt_dict.get('format', 'unknown')}")
-    print(f"  Bit depth: {fmt_dict.get('bpp', 'unknown')}")
-    print(f"  Data type: {display_data.dtype}")
-    print(f"  Value range: {display_data.min()}-{display_data.max()}")
-    print(f"  Raw size: {display_data.nbytes / (1024 * 1024):.2f} MB")
-    print()
-    
-    # Create PiDNG camera model from picamera2 metadata
-    from pidng.camdefs import Picamera2Camera
-    camera_model = Picamera2Camera(fmt_dict, metadata, model="Picamera2 Benchmark")
-    print(f"Camera model: {camera_model.model}")
-    print()
+    Args:
+        cfa_data: Raw CFA data
+        camera_model: PiDNG camera model
+        iterations: Number of iterations per scenario
+    """
+    from tifffile import COMPRESSION
     
     # Define test scenarios
-    from tifffile import COMPRESSION
     scenarios = [
-        # (library, compression_name, destination, compression_obj, compression_args, num_workers)
+        # (library, compression_name, destination, comp_obj, compression_args, num_workers, preview)
         
         # PiDNG tests (file only)
         ("pidng", "uncompressed", "file", None, None, 1),
@@ -425,9 +469,15 @@ def main():
          {'distance': 0.5, 'effort': 4}, 2),
         ("muimg", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.5, 'effort': 4}, 4),
+        
+        # muimg tests - with preview
+        ("muimg", "uncompressed+preview", "file", COMPRESSION.NONE, None, 1, True),
+        ("muimg", "jxl_lossless+preview", "file", COMPRESSION.JPEGXL_DNG,
+         {'distance': 0.0, 'effort': 2}, 4, True),
+        ("muimg", "jxl_lossy+preview", "file", COMPRESSION.JPEGXL_DNG,
+         {'distance': 0.5, 'effort': 4}, 4, True),
     ]
     
-    iterations = 10
     print(f"Running {len(scenarios)} test scenarios ({iterations} iterations each)...")
     print()
     
@@ -442,5 +492,122 @@ def main():
     save_results_json(results, output_path)
 
 
+# =============================================================================
+# Main
+# =============================================================================
+
+def main():
+    """Run picamera2 capture and DNG writing benchmark."""
+    parser = argparse.ArgumentParser(
+        description="Capture raw image from picamera2 and write DNG with various options"
+    )
+    parser.add_argument(
+        "-v", "--verbose", action="count", default=0,
+        help="Increase verbosity (use -v or -vv for more detail)"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["benchmark", "single"],
+        default="single",
+        help="Run mode: single capture or benchmark (default: single)"
+    )
+    parser.add_argument(
+        "--compression",
+        choices=["uncompressed", "jpeg_lossless", "jxl_lossless", "jxl_lossy"],
+        default="uncompressed",
+        help="Compression type for single mode (default: uncompressed)"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of compression workers for single mode (default: 1)"
+    )
+    parser.add_argument(
+        "--preview",
+        action="store_true",
+        help="Enable preview generation for single mode"
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("capture.dng"),
+        help="Output file path for single mode (default: capture.dng)"
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=10,
+        help="Number of iterations for benchmark mode (default: 10)"
+    )
+    args = parser.parse_args()
+    
+    # Create results directory
+    Path("results").mkdir(exist_ok=True)
+    
+    print("=" * 90)
+    print("Picamera2 DNG Capture and Writing Benchmark: PiDNG vs muimg")
+    print("=" * 90)
+    print()
+    
+    # Initialize camera and capture
+    cfa_data, camera_model = capture()
+    
+    # Run in selected mode
+    if args.mode == "single":
+        # Map compression name to tifffile COMPRESSION
+        from tifffile import COMPRESSION
+        compression_map = {
+            "uncompressed": COMPRESSION.NONE,
+            "jpeg_lossless": COMPRESSION.JPEG,
+            "jxl_lossless": COMPRESSION.JPEGXL_DNG,
+            "jxl_lossy": COMPRESSION.JPEGXL_DNG,
+        }
+        compression = compression_map[args.compression]
+        
+        # Set compression args
+        if args.compression == "jpeg_lossless":
+            compression_args = {'lossless': True}
+        elif args.compression == "jxl_lossless":
+            compression_args = {'distance': 0.0, 'effort': 2}
+        elif args.compression == "jxl_lossy":
+            compression_args = {'distance': 0.5, 'effort': 4}
+        else:
+            compression_args = None
+        
+        run_single_mode(
+            cfa_data, camera_model,
+            args.compression, compression, compression_args,
+            args.workers, args.preview, args.output
+        )
+    else:
+        run_benchmark_mode(cfa_data, camera_model, args.iterations)
+
+
 if __name__ == "__main__":
+    import logging
+    import sys
+    
+    # Parse args first to get verbose level
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-v", "--verbose", action="count", default=0)
+    args, _ = parser.parse_known_args()
+    
+    # Set logging level based on verbosity
+    if args.verbose >= 2:
+        level = logging.DEBUG
+    elif args.verbose >= 1:
+        level = logging.INFO
+    else:
+        level = logging.WARNING
+    
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Set picamera2 logging to match command line verbosity
+    picamera2_logger = logging.getLogger('picamera2')
+    picamera2_logger.setLevel(level)
+    
     main()

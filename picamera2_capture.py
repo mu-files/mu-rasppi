@@ -11,13 +11,23 @@ the Raspberry Pi community.
 import argparse
 import io
 import json
+import sys
 import time
 from contextlib import redirect_stderr
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-from picamera2 import Picamera2, MappedArray
+
+try:
+    from picamera2 import Picamera2, MappedArray
+except ImportError:
+    print(
+        "ERROR: picamera2 is required but not installed.\n"
+        "Install with: pip install -e \".[pi]\"",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 # =============================================================================

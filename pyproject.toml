@@ -10,7 +10,15 @@ authors = [{name = "mu-files", email = "info@mu-files.com"}]
 requires-python = ">=3.12"
 dependencies = [
     "numpy",
-    "picamera2",
-    "pidng @ git+https://github.com/schoolpost/PiDNG.git",
     "muimg",
 ]
+
+[project.optional-dependencies]
+astro = ["astropy"]
+pi = [
+    "picamera2",
+    "pidng @ git+https://github.com/schoolpost/PiDNG.git",
+]
+
+[tool.setuptools]
+py-modules = ["fits2dng", "picamera2_capture"]

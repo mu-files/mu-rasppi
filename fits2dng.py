@@ -191,6 +191,17 @@ _ASI676MC_GAIN_TABLE = np.array([
     [200, 0.30],
 ])
 
+# ZWO ASI676MC blue white balance table: (wb_b, balance)
+# Derived from piecewise calibration, neutral at wb_b=75 (app default)
+_ASI676MC_WB_BLUE_TABLE = np.array([
+    [1,   0.01],
+    [50,  0.59],
+    [55,  0.73],
+    [65,  0.87],
+    [75,  1.00],
+    [100, 1.34],
+])
+
 
 def _gain_to_iso(gain: float, gain_table: np.ndarray) -> int:
     """Convert camera gain to ISO using e-/ADU gain table.
@@ -222,11 +233,28 @@ def _build_unique_camera_tags(tags: MetadataTags, header) -> None:
         if gain is not None:
             iso = _gain_to_iso(float(gain), _ASI676MC_GAIN_TABLE)
             tags.add_tag("ISOSpeedRatings", iso)
+
+        # Analog balance (white balance)
+        wb_r = header.get("WB_RED")
+        wb_b = header.get("WB_BLUE")
+        if wb_r is not None and wb_b is not None:
+            wb_r_neutral, wb_b_neutral = 80, 100
+            red_balance = float(wb_r) / float(wb_r_neutral)
+            blue_balance = float(
+                np.interp(wb_b, _ASI676MC_WB_BLUE_TABLE[:, 0],
+                          _ASI676MC_WB_BLUE_TABLE[:, 1])
+            ) / float(
+                np.interp(wb_b_neutral, _ASI676MC_WB_BLUE_TABLE[:, 0],
+                          _ASI676MC_WB_BLUE_TABLE[:, 1])
+            )
+            tags.add_tag("AnalogBalance",
+                         [red_balance, 1.0, blue_balance])
     else:
         # Fallback: use raw gain as ISO
         if gain is not None:
             print(f"  '{instrume}' not in camera fits2dng.py profiles: fallback to default gain")
             tags.add_tag("ISOSpeedRatings", int(gain))
+        tags.add_tag("AnalogBalance", [1.0, 1.0, 1.0])
 
 
 def build_metadata_tags(header, data: np.ndarray) -> MetadataTags:

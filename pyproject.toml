@@ -14,11 +14,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-astro = ["astropy"]
+astro = ["astropy", "zwoasi"]
+zwo = ["zwoasi"]
 pi = [
     "picamera2",
     "pidng @ git+https://github.com/schoolpost/PiDNG.git",
 ]
 
 [tool.setuptools]
-py-modules = ["fits2dng", "picamera2_capture"]
+py-modules = ["fits2dng", "picamera2_capture", "zwo_capture"]

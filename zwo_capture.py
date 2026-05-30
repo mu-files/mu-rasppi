@@ -27,7 +27,106 @@ except ImportError:
     )
     sys.exit(1)
 
-from fits2dng import build_metadata_tags
+# =============================================================================
+# Camera metadata helpers (inlined from mu-dng-converter/fits2dng.py)
+# =============================================================================
+
+# ZWO ASI676MC gain table: (camera_gain, e-/ADU)
+_ASI676MC_GAIN_TABLE = np.array([
+    [0, 2.55], [50, 1.50], [100, 0.85],
+    [150, 0.50], [200, 0.30],
+])
+
+# ZWO ASI676MC blue white balance table: (wb_b, balance)
+_ASI676MC_WB_BLUE_TABLE = np.array([
+    [1, 0.01], [50, 0.59], [55, 0.73],
+    [65, 0.87], [75, 1.00], [100, 1.34],
+])
+
+
+def _gain_to_iso(gain: float, gain_table: np.ndarray) -> int:
+    e = np.interp(gain, gain_table[:, 0], gain_table[:, 1])
+    return int(100 * gain_table[0, 1] / e)
+
+
+def _build_camera_tags(tags, header) -> None:
+    instrume = str(header.get("INSTRUME", "")).strip()
+    gain = header.get("GAIN")
+
+    if instrume == "ZWO ASI676MC":
+        if gain is not None:
+            tags.add_tag("ISOSpeedRatings", _gain_to_iso(float(gain), _ASI676MC_GAIN_TABLE))
+        wb_r = header.get("WB_RED")
+        wb_b = header.get("WB_BLUE")
+        if wb_r is not None and wb_b is not None:
+            wb_r_neutral, wb_b_neutral = 80, 100
+            red_balance = float(wb_r) / float(wb_r_neutral)
+            blue_balance = float(
+                np.interp(wb_b, _ASI676MC_WB_BLUE_TABLE[:, 0], _ASI676MC_WB_BLUE_TABLE[:, 1])
+            ) / float(
+                np.interp(wb_b_neutral, _ASI676MC_WB_BLUE_TABLE[:, 0], _ASI676MC_WB_BLUE_TABLE[:, 1])
+            )
+            tags.add_tag("AnalogBalance", [red_balance, 1.0, blue_balance])
+    else:
+        if gain is not None:
+            tags.add_tag("ISOSpeedRatings", int(gain))
+        tags.add_tag("AnalogBalance", [1.0, 1.0, 1.0])
+
+
+def build_metadata_tags(header: dict, cfa_data: np.ndarray):
+    """Build DNG MetadataTags from a ZWO-style FITS-like header dict."""
+    from muimg.tiff_metadata import MetadataTags
+
+    tags = MetadataTags()
+
+    instrume = header.get("INSTRUME")
+    if instrume:
+        tags.add_tag("UniqueCameraModel", str(instrume))
+
+    _build_camera_tags(tags, header)
+
+    exptime = header.get("EXPTIME")
+    if exptime is not None:
+        tags.add_tag("ExposureTime", float(exptime))
+
+    date_obs = header.get("DATE-OBS")
+    if date_obs is not None:
+        from datetime import datetime as _dt
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+            try:
+                tags.add_time_tags(_dt.strptime(date_obs.strip(), fmt), "original")
+                break
+            except ValueError:
+                continue
+
+    blklevel = header.get("PEDESTAL")
+    if blklevel is not None:
+        tags.add_tag("BlackLevel", int(blklevel))
+
+    whtlevel = header.get("CWHITE")
+    if whtlevel is not None:
+        tags.add_tag("WhiteLevel", int(whtlevel))
+
+    tags.add_tag("ProfileToneCurve", [0.0, 0.0, 1.0, 1.0])
+
+    # Auto exposure: estimate black level and BaselineExposure from histogram
+    wl = int(header.get("CWHITE", 65535))
+    num_bins = min(wl, 10000)
+    hist, bin_edges = np.histogram(cfa_data.ravel(), bins=num_bins, range=(0, wl))
+    cdf = np.cumsum(hist).astype(np.float64) / np.sum(hist)
+    p1_idx = np.searchsorted(cdf, 0.01)
+    p50_idx = np.searchsorted(cdf, 0.50)
+    p1 = int(bin_edges[min(p1_idx, len(bin_edges) - 1)])
+    median = int(bin_edges[min(p50_idx, len(bin_edges) - 1)])
+    clip_idx = np.searchsorted(bin_edges[:-1], 0.975 * wl)
+    clipped = (1.0 - (cdf[clip_idx - 1] if clip_idx > 0 else 0.0)) > 0.25
+
+    if blklevel is None and p1 > 0:
+        tags.add_tag("BlackLevel", p1)
+    if not clipped and median > 0:
+        tags.add_tag("BaselineExposure", float(np.log2(wl * 0.06 / median)))
+
+    return tags
 
 
 # =============================================================================

@@ -6,13 +6,12 @@ Example scripts for capturing and converting raw camera data to DNG using [muimg
 
 | Script | Description | Audience |
 |--------|-------------|----------|
-| [`fits2dng.py`](fits2dng.py) | Convert FITS CFA files to DNG | Astrophotography |
 | [`zwo_capture.py`](zwo_capture.py) | Live capture from ZWO ASI cameras to DNG | Astrophotography |
 | [`picamera2_capture.py`](picamera2_capture.py) | Picamera2 capture & DNG benchmark | Raspberry Pi |
 
 ## Documentation
 
-- **[Astronomy / ZWO](docs/README_astro.md)** — FITS conversion and ZWO ASI live capture
+- **[Astronomy / ZWO](docs/README_astro.md)** — ZWO ASI live capture; FITS→DNG conversion is in [mu-dng-converter](https://github.com/mu-files/mu-image/tree/main/mu-dng-converter)
 - **[Raspberry Pi Camera](docs/README_picamera2.md)** — Picamera2 benchmark & DNG writing
 
 ## Installation
@@ -21,7 +20,7 @@ Example scripts for capturing and converting raw camera data to DNG using [muimg
 git clone https://github.com/mu-files/mu-rasppi.git
 cd mu-rasppi
 python3 -m venv venv
-pip install -e ".[astro]"   # FITS + ZWO support (astropy, zwoasi)
+pip install -e ".[zwo]"     # ZWO ASI support (zwoasi)
 pip install -e ".[pi]"      # Raspberry Pi support (picamera2, PiDNG)
 ```
 

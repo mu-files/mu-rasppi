@@ -1,53 +1,6 @@
-# Astronomy: FITS to DNG & ZWO ASI Capture
+# Astronomy: ZWO ASI Capture
 
-Tools for converting astronomy camera data to Adobe DNG format using [muimg](https://github.com/mu-files/mu-image).
-
-## fits2dng.py — Convert FITS to DNG
-
-Converts FITS CFA (Color Filter Array) files to DNG with full metadata mapping.
-
-### Features
-
-- **Compression**: Support for Uncompressed, JPEG lossless, JPEG XL lossless/lossy DNGs
-- **Preview**: Optional embedded JPEG preview for instant thumbnails
-- **Camera-specific metadata**: Gain→ISO conversion, white balance (AnalogBalance) for ZWO ASI676MC
-
-
-### Usage
-
-```bash
-# Basic conversion
-python fits2dng.py input.FIT
-
-# With compression and preview
-python fits2dng.py input.FIT --compression jxl_lossless --preview
-
-# Specify output path
-python fits2dng.py input.FIT -o output.dng
-
-# Print FITS header info (no conversion)
-python fits2dng.py input.FIT --info
-```
-
-### Options
-
-```
---pattern       Bayer pattern: RGGB, BGGR, GRBG, GBRG (default: RGGB)
---compression   uncompressed, jpeg_lossless, jxl_lossless, jxl_lossy
---workers       Number of compression workers (default: 1)
---preview       Generate embedded JPEG preview
--o, --output    Output DNG path (default: same name with .dng extension)
---info          Print FITS header and exit
-```
-
-### Supported Cameras
-
-| Camera | ISO | White Balance | Notes |
-|--------|-----|---------------|-------|
-| ZWO ASI676MC | Gain table interpolation | Non-linear blue + linear red | Calibrated neutral at (80, 100) |
-| Other | Raw gain value | Neutral (1, 1, 1) | Fallback for unknown cameras |
-
----
+Live capture from ZWO ASI cameras to DNG using [muimg](https://github.com/mu-files/mu-image).
 
 ## zwo_capture.py — Live ZWO ASI Capture to DNG
 
@@ -125,10 +78,10 @@ The ZWO ASI SDK library must be accessible. The script searches these locations:
 ```bash
 cd mu-rasppi
 python3 -m venv venv
-venv/bin/pip install -e ".[astro]"
+venv/bin/pip install -e ".[zwo]"
 ```
 
-This installs `muimg`, `astropy`, `numpy`, and `zwoasi`.
+This installs `muimg`, `numpy`, and `zwoasi`.
 
 ## DNG Output
 
@@ -150,7 +103,7 @@ The ZWO ASI SDK is x86_64-only. On Apple Silicon Macs you must create an x86_64 
 ```bash
 # Create x86_64 venv (requires x86 Python via Homebrew under Rosetta)
 arch -x86_64 /usr/local/bin/python3 -m venv venv-x86
-venv-x86/bin/pip install -e ".[astro]"
+venv-x86/bin/pip install -e ".[zwo]"
 
 # Run capture under Rosetta
 venv-x86/bin/python zwo_capture.py
@@ -162,5 +115,5 @@ If you don't have an x86_64 Python, install one with:
 arch -x86_64 /usr/local/bin/brew install python@3.13
 ```
 
-> **Note**: `fits2dng.py` does not require the ZWO SDK and works natively on Apple Silicon.
+> **Note**: `mu-dng-fits` does not require the ZWO SDK and works natively on Apple Silicon.
 

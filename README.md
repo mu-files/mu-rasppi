@@ -110,7 +110,7 @@ See the complete implementation at the top of [`picamera2_capture.py`](picamera2
 
 ## License
 
-MIT License - See LICENSE file for details.
+BSD 3-Clause License — see [LICENSE](LICENSE) for details.
 
 ## Credits
 

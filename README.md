@@ -26,7 +26,7 @@ pip install -e ".[pi]"      # Raspberry Pi support (picamera2, PiDNG)
 
 ## License
 
-MIT License - See LICENSE file for details.
+BSD 3-Clause License — see [LICENSE](LICENSE) for details.
 
 ## Credits
 

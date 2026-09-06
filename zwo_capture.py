@@ -2,10 +2,10 @@
 """Capture a single raw frame from a ZWO ASI camera and save as DNG.
 
 This script is designed to be simple and self-contained for sharing as an
-example of ZWO camera capture to DNG using muimg.
+example of ZWO camera capture to DNG using muraw.
 
 Requirements:
-    pip install numpy zwoasi muimg
+    pip install numpy zwoasi muraw
 """
 
 import argparse
@@ -75,7 +75,7 @@ def _build_camera_tags(tags, header) -> None:
 
 def build_metadata_tags(header: dict, cfa_data: np.ndarray):
     """Build DNG MetadataTags from a ZWO-style FITS-like header dict."""
-    from muimg.tiff_metadata import MetadataTags
+    from muraw.tiff_metadata import MetadataTags
 
     tags = MetadataTags()
 
@@ -192,7 +192,7 @@ def build_metadata(camera_info: dict, metadata: dict, cfa_data: np.ndarray):
 def write_dng(cfa_data: np.ndarray, output: Path, tags, bayer_pattern: str,
               compression, compression_args=None, num_workers=1,
               preview: bool = False):
-    """Write CFA data as DNG using muimg.
+    """Write CFA data as DNG using muraw.
 
     Args:
         cfa_data: Raw CFA array (H, W) as uint16
@@ -204,7 +204,7 @@ def write_dng(cfa_data: np.ndarray, output: Path, tags, bayer_pattern: str,
         num_workers: Number of compression workers
         preview: Generate JPEG preview
     """
-    from muimg.dngio import (
+    from muraw.dngio import (
         write_dng_from_array, IfdDataSpec, PageEncoding,
         PreviewParams, PreviewScale,
     )

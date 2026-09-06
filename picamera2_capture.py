@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark picamera2 capture with PiDNG vs muimg DNG writing.
+"""Benchmark picamera2 capture with PiDNG vs muraw DNG writing.
 
 Captures a single raw image using picamera2 and benchmarks saving it with
 different libraries and compression methods.
@@ -31,13 +31,13 @@ except ImportError:
 
 
 # =============================================================================
-# muimg DNG Writer (Main Function)
+# muraw DNG Writer (Main Function)
 # =============================================================================
 
-def write_muimg(cfa_data: np.ndarray, output, compression,
+def write_muraw(cfa_data: np.ndarray, output, compression,
                 compression_args=None, camera_model=None, num_workers=1,
                 preview: bool = False):
-    """Write DNG using muimg library.
+    """Write DNG using muraw library.
     
     Args:
         cfa_data: CFA array - can be uint8 (packed) or uint16 (unpacked)
@@ -48,8 +48,8 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
         num_workers: Number of compression workers
         preview: If True, generate a JPEG-compressed 1/4 scale preview
     """
-    from muimg.dngio import write_dng_from_array, IfdDataSpec, PageEncoding
-    from muimg.tiff_metadata import MetadataTags
+    from muraw.dngio import write_dng_from_array, IfdDataSpec, PageEncoding
+    from muraw.tiff_metadata import MetadataTags
     from tifffile import COMPRESSION
     
     # Unpack uint8 to uint16 if needed
@@ -94,7 +94,7 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
     # Create preview params if requested
     preview_params = None
     if preview:
-        from muimg.dngio import PreviewParams, PreviewScale
+        from muraw.dngio import PreviewParams, PreviewScale
         preview_params = PreviewParams(scale=PreviewScale.QUARTER, compression=COMPRESSION.JPEG)
     
     write_dng_from_array(
@@ -106,14 +106,14 @@ def write_muimg(cfa_data: np.ndarray, output, compression,
 
 
 # =============================================================================
-# muimg Helper Functions
+# muraw Helper Functions
 # =============================================================================
 
 def convert_to_16bit_for_jxl(cfa_data, bits_per_sample, extra_tags):
     """Convert CFA data and metadata from current bit depth to 16-bit for JXL.
     
     Note: For 9 <= bits_per_sample <= 15 and JXL, Photoshop has a bug decoding 
-    the DNGs. muimg can encode and decode using JXL with these bit counts, but 
+    the DNGs. muraw can encode and decode using JXL with these bit counts, but 
     if you want to read the DNG in Photoshop then conversion to 16-bit is required.
     
     Args:
@@ -124,7 +124,7 @@ def convert_to_16bit_for_jxl(cfa_data, bits_per_sample, extra_tags):
     Returns:
         tuple: (converted_cfa_data, new_bits_per_sample)
     """
-    from muimg.raw_render import convert_dtype
+    from muraw.raw_render import convert_dtype
     
     # Convert data from current bit depth to 16-bit
     cfa_data = convert_dtype(cfa_data, np.uint16, src_bits_per_element=bits_per_sample)
@@ -285,7 +285,7 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
         comp_args = scenario[4] if len(scenario) > 4 else None
         num_workers = scenario[5] if len(scenario) > 5 else 1
         preview = scenario[6] if len(scenario) > 6 else None
-        workers_str = f"w={num_workers}" if library == "muimg" else ""
+        workers_str = f"w={num_workers}" if library == "muraw" else ""
         print(f"  {library:5s} | {compression_name:22s} | {workers_str:4s} | {destination:7s} ... ", 
               end="", flush=True)
         
@@ -295,8 +295,8 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
         
         for j in range(iterations):
             if destination == "file":
-                # Include worker count in filename for muimg tests
-                if library == "muimg" and num_workers > 1:
+                # Include worker count in filename for muraw tests
+                if library == "muraw" and num_workers > 1:
                     output = Path(f"results/test_{library}_{compression_name}_w{num_workers}_{j}.dng")
                 else:
                     output = Path(f"results/test_{library}_{compression_name}_{j}.dng")
@@ -310,8 +310,8 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
                 compress = (compression_name == "lj92")
                 write_pidng(cfa_data, output, compress=compress, 
                            camera_model=camera_model)
-            elif library == "muimg":
-                write_muimg(cfa_data, output, compression=comp_obj, 
+            elif library == "muraw":
+                write_muraw(cfa_data, output, compression=comp_obj, 
                            compression_args=comp_args, camera_model=camera_model,
                            num_workers=num_workers, preview=preview)
             else:
@@ -340,7 +340,7 @@ def run_benchmark(cfa_data, camera_model, scenarios, iterations=10):
         result = {
             'library': library,
             'compression': compression_name,
-            'num_workers': num_workers if library == "muimg" else None,
+            'num_workers': num_workers if library == "muraw" else None,
             'destination': destination,
             'mean_time_ms': float(np.mean(times_arr) * 1000),
             'std_time_ms': float(np.std(times_arr) * 1000),
@@ -424,7 +424,7 @@ def run_single_mode(cfa_data, camera_model, compression_name, compression,
     print()
     
     # Run capture
-    write_muimg(
+    write_muraw(
         cfa_data, output_path, compression,
         compression_args=compression_args,
         camera_model=camera_model,
@@ -462,31 +462,31 @@ def run_benchmark_mode(cfa_data, camera_model, iterations=10):
         ("pidng", "uncompressed", "file", None, None, 1),
         ("pidng", "lj92", "file", None, None, 1),
         
-        # muimg tests - 
-        ("muimg", "uncompressed", "file", COMPRESSION.NONE, None, 1),
-        ("muimg", "jpeg_lossless", "file", COMPRESSION.JPEG, {'lossless': True}, 1),
-        ("muimg", "jpeg_lossless", "file", COMPRESSION.JPEG, {'lossless': True}, 2),
-        ("muimg", "jpeg_lossless", "file", COMPRESSION.JPEG, {'lossless': True}, 4),
+        # muraw tests - 
+        ("muraw", "uncompressed", "file", COMPRESSION.NONE, None, 1),
+        ("muraw", "jpeg_lossless", "file", COMPRESSION.JPEG, {'lossless': True}, 1),
+        ("muraw", "jpeg_lossless", "file", COMPRESSION.JPEG, {'lossless': True}, 2),
+        ("muraw", "jpeg_lossless", "file", COMPRESSION.JPEG, {'lossless': True}, 4),
         
-        # muimg tests - JXL
-        ("muimg", "jxl_lossless", "file", COMPRESSION.JPEGXL_DNG, 
+        # muraw tests - JXL
+        ("muraw", "jxl_lossless", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.0, 'effort': 2}, 1),
-        ("muimg", "jxl_lossless", "file", COMPRESSION.JPEGXL_DNG, 
+        ("muraw", "jxl_lossless", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.0, 'effort': 2}, 2),
-        ("muimg", "jxl_lossless", "file", COMPRESSION.JPEGXL_DNG, 
+        ("muraw", "jxl_lossless", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.0, 'effort': 2}, 4),
-        ("muimg", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
+        ("muraw", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.5, 'effort': 4}, 1),
-        ("muimg", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
+        ("muraw", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.5, 'effort': 4}, 2),
-        ("muimg", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
+        ("muraw", "jxl_lossy", "file", COMPRESSION.JPEGXL_DNG, 
          {'distance': 0.5, 'effort': 4}, 4),
         
-        # muimg tests - with preview
-        ("muimg", "uncompressed+preview", "file", COMPRESSION.NONE, None, 1, True),
-        ("muimg", "jxl_lossless+preview", "file", COMPRESSION.JPEGXL_DNG,
+        # muraw tests - with preview
+        ("muraw", "uncompressed+preview", "file", COMPRESSION.NONE, None, 1, True),
+        ("muraw", "jxl_lossless+preview", "file", COMPRESSION.JPEGXL_DNG,
          {'distance': 0.0, 'effort': 2}, 4, True),
-        ("muimg", "jxl_lossy+preview", "file", COMPRESSION.JPEGXL_DNG,
+        ("muraw", "jxl_lossy+preview", "file", COMPRESSION.JPEGXL_DNG,
          {'distance': 0.5, 'effort': 4}, 4, True),
     ]
     
@@ -558,7 +558,7 @@ def main():
     Path("results").mkdir(exist_ok=True)
     
     print("=" * 90)
-    print("Picamera2 DNG Capture and Writing Benchmark: PiDNG vs muimg")
+    print("Picamera2 DNG Capture and Writing Benchmark: PiDNG vs muraw")
     print("=" * 90)
     print()
     

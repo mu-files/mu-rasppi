@@ -1,6 +1,6 @@
 # Astronomy: ZWO ASI Capture
 
-Live capture from ZWO ASI cameras to DNG using [muimg](https://github.com/mu-files/mu-image).
+Live capture from ZWO ASI cameras to DNG using [muraw](https://github.com/mu-files/mu-image).
 
 ## zwo_capture.py — Live ZWO ASI Capture to DNG
 
@@ -38,23 +38,23 @@ python zwo_capture.py --exposure 1000 --gain 150 --compression jxl_lossless -o d
 -o, --output    Output DNG path (default: capture.dng)
 ```
 
-### Working with the DNG in muimg
+### Working with the DNG in muraw
 
-Use `muimg` to inspect and render the created DNGs:
+Use `muraw` to inspect and render the created DNGs:
 
 ```bash
 # Inspect metadata
-muimg dng metadata file.dng
+muraw dng metadata file.dng
 
 # Render to TIFF with custom development parameters
-muimg dng convert file.dng file.tif --temperature 5500 --tint 10 --exposure 1.5
+muraw dng convert file.dng file.tif --temperature 5500 --tint 10 --exposure 1.5
 
 # Batch convert a folder of DNGs to 16-bit TIFFs
-muimg dng batch-convert ./captures/ ./output/ --format tif --bit-depth 16 \
+muraw dng batch-convert ./captures/ ./output/ --format tif --bit-depth 16 \
     --temperature 5500 --tint 10 --exposure 1.5 --num-workers 4
 
 # Batch convert with per-file settings from CSV
-muimg dng batch-convert settings.csv ./output/ --format tif --bit-depth 16
+muraw dng batch-convert settings.csv ./output/ --format tif --bit-depth 16
 ```
 
 The CSV file format for per-file settings:
@@ -81,7 +81,7 @@ python3 -m venv venv
 venv/bin/pip install -e ".[zwo]"
 ```
 
-This installs `muimg`, `numpy`, and `zwoasi`.
+This installs `muraw`, `numpy`, and `zwoasi`.
 
 ## DNG Output
 

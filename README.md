@@ -1,6 +1,6 @@
 # mu-rasppi
 
-Example scripts for capturing and converting raw camera data to DNG using [muimg](https://github.com/mu-files/mu-image).
+Example scripts for capturing and converting raw camera data to DNG using [muraw](https://github.com/mu-files/mu-image).
 
 ## Scripts
 
@@ -30,7 +30,7 @@ BSD 3-Clause License — see [LICENSE](LICENSE) for details.
 
 ## Credits
 
-- **muimg**: https://github.com/mu-files/mu-image
+- **muraw**: https://github.com/mu-files/mu-image
 - **PiDNG**: https://github.com/schoolpost/PiDNG
 - **picamera2**: https://github.com/raspberrypi/picamera2
 - **zwoasi**: https://github.com/python-zwo/python-zwoasi
